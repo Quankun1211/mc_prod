@@ -4,3 +4,4 @@ motor
 pandas
 scikit-learn
 python-dotenv
+openpyxl

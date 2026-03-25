@@ -2,10 +2,11 @@ import motor.motor_asyncio
 import os
 from dotenv import load_dotenv
 from bson import ObjectId
-
+import pandas as pd
+import io
 load_dotenv()
 
-MONGO_URI = os.getenv("MONGO_URI")
+MONGO_URI = os.getenv("MONGO_DB_URL")
 
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
 
@@ -95,3 +96,29 @@ async def get_all_recipes():
     except Exception as e:
         print(f"DEBUG DB ERROR: {e}")
         return []
+    
+async def generate_user_excel_report():
+    query_filter = {"role": {"$regex": "^user\s*$", "$options": "i"}}
+    projection = {"_id": 1, "name": 1, "username": 1, "email": 1, "createdAt": 1, "role": 1}
+    
+    users_data = await db.users.find(query_filter, projection).to_list(length=5000)
+    
+    if not users_data:
+        sample = await db.users.find_one({})
+        return None, f"'{sample.get('role')}'" if sample else "DB Rỗng"
+
+    df = pd.json_normalize(users_data)
+    column_mapping = {"_id": "Mã Người Dùng", "name": "Họ và Tên", "username": "Tên Đăng Nhập", "email": "Email", "createdAt": "Ngày Tham Gia", "role": "Vai Trò"}
+    df.rename(columns={k: v for k, v in column_mapping.items() if k in df.columns}, inplace=True)
+
+    if "Ngày Tham Gia" in df.columns:
+        df["Ngày Tham Gia"] = pd.to_datetime(df["Ngày Tham Gia"]).dt.strftime('%d/%m/%Y %H:%M')
+
+    for col in df.columns:
+        df[col] = df[col].apply(lambda x: str(x) if x is not None else "")
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Users')
+    output.seek(0)
+    return output, None

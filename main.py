@@ -2,13 +2,16 @@ from fastapi import FastAPI
 from db import (
     get_all_user_interactions, 
     get_all_products, 
-    get_all_recipes
+    get_all_recipes,
+    generate_user_excel_report
 )
 from recommender import RecommenderEngine
 import uvicorn
 from bson import ObjectId 
 from fastapi.middleware.cors import CORSMiddleware
 import os
+from fastapi.responses import StreamingResponse
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -55,6 +58,18 @@ async def get_recommendations(id: str):
         print(f"❌ Error in recommend route: {e}")
         return {"status": "error", "message": str(e), "data": []}
 
+@app.get("/export/users")
+async def export_users():
+    output, error_msg = await generate_user_excel_report()
+    
+    if error_msg:
+        return {"status": "error", "message": f"Không tìm thấy role 'user'. Role thực tế: {error_msg}"}
+
+    return StreamingResponse(
+        output,
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename="thong_ke_user.xlsx"'}
+    )
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
