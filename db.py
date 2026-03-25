@@ -6,13 +6,18 @@ from bson import ObjectId
 load_dotenv()
 
 MONGO_URI = os.getenv("MONGO_URI")
+
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
-db = client.get_default_database()
+
+db = client["MenuApp"] 
 
 async def get_all_user_interactions(user_id: str):
     try:
+        if not ObjectId.is_valid(user_id):
+            print(f"[AI Warning] Invalid user_id format: {user_id}")
+            return []
+            
         uid = ObjectId(user_id)
-        # Lấy 50 hành vi gần nhất của người dùng
         cursor = db.userbehaviors.find({"userId": uid}).sort("createdAt", -1).limit(50)
         behaviors = await cursor.to_list(length=50)
         
@@ -23,12 +28,10 @@ async def get_all_user_interactions(user_id: str):
             target_id = b.get("targetId")
             target_type = b.get("targetType", "Product")
 
-            # Trường hợp 1: Hành vi đặt hàng (Cần bóc tách các sản phẩm trong đơn)
+            # Trường hợp 1: Hành vi đặt hàng
             if action == "order" or target_type == "Order":
                 try:
                     o_id = ObjectId(target_id) if ObjectId.is_valid(target_id) else target_id
-                    
-                    # Truy vấn tất cả sản phẩm thuộc đơn hàng này
                     item_cursor = db.orderitems.find({"orderId": o_id})
                     items = await item_cursor.to_list(length=100)
                     
@@ -39,11 +42,11 @@ async def get_all_user_interactions(user_id: str):
                                 "targetType": "Product",
                                 "action": "order" 
                             })
-                        continue # Đã xử lý xong Order, chuyển sang behavior tiếp theo
+                        continue 
                 except Exception:
-                    pass # Bỏ qua lỗi bóc tách đơn lẻ để không dừng hệ thống
+                    pass 
 
-            # Trường hợp 2: Xem Menu (Bóc tách các sản phẩm trong menu đó)
+            # Trường hợp 2: Xem Menu
             elif target_type == "Menu" and action == "view":
                 try:
                     menu = await db.menus.find_one({"_id": ObjectId(target_id)})
@@ -58,7 +61,7 @@ async def get_all_user_interactions(user_id: str):
                 except Exception:
                     pass
 
-            # Trường hợp 3: Các hành vi trực tiếp (view sản phẩm, view công thức, add to cart)
+            # Trường hợp 3: Các hành vi trực tiếp
             if target_id:
                 all_interactions.append({
                     "targetId": str(target_id),
@@ -72,6 +75,7 @@ async def get_all_user_interactions(user_id: str):
     except Exception as e:
         print(f"[AI Critical Error] get_all_user_interactions: {e}")
         return []
+
 async def get_all_products():
     try:
         cursor = db.products.find({}) 

@@ -6,20 +6,19 @@ from db import (
 )
 from recommender import RecommenderEngine
 import uvicorn
-from bson import ObjectId # Đảm bảo đã import ObjectId
+from bson import ObjectId 
 from fastapi.middleware.cors import CORSMiddleware
 import os
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Cho phép tất cả các nguồn truy cập
+    allow_origins=["*"],  
     allow_credentials=True,
-    allow_methods=["*"],  # Cho phép tất cả các phương thức (GET, POST,...)
-    allow_headers=["*"],  # Cho phép tất cả các headers
+    allow_methods=["*"],  
+    allow_headers=["*"], 
 )
 engine = RecommenderEngine()
 
-# Hàm helper để xử lý tất cả ObjectId lồng nhau
 def clean_mongo_data(data):
     if isinstance(data, list):
         return [clean_mongo_data(item) for item in data]
@@ -37,16 +36,13 @@ async def get_recommendations(id: str):
         all_products = await get_all_products() 
         all_recipes = await get_all_recipes()
         
-        # 2. Engine tính toán
         recommend_ids = engine.suggest_all_in_one(history, all_products, all_recipes)
         
-        # 3. Map dữ liệu
         product_map = {str(p['_id']): p for p in all_products}
         
         recommended_full_objects = []
         for rid in recommend_ids:
             if rid in product_map:
-                # Ép kiểu toàn bộ object (bao gồm cả các ID lồng bên trong)
                 clean_prod = clean_mongo_data(product_map[rid])
                 recommended_full_objects.append(clean_prod)
 
