@@ -7,8 +7,16 @@ from db import (
 from recommender import RecommenderEngine
 import uvicorn
 from bson import ObjectId # Đảm bảo đã import ObjectId
-
+from fastapi.middleware.cors import CORSMiddleware
+import os
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Cho phép tất cả các nguồn truy cập
+    allow_credentials=True,
+    allow_methods=["*"],  # Cho phép tất cả các phương thức (GET, POST,...)
+    allow_headers=["*"],  # Cho phép tất cả các headers
+)
 engine = RecommenderEngine()
 
 # Hàm helper để xử lý tất cả ObjectId lồng nhau
@@ -52,4 +60,5 @@ async def get_recommendations(id: str):
         return {"status": "error", "message": str(e), "data": []}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
